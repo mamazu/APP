@@ -14,13 +14,13 @@
 
   <target name="compile" depends="init" description="compile the source">
     <!-- Compile the java code from ${src} into ${build} -->
-    <javac srcdir="${src}" destdir="${build}" includeantruntime="true"/>
+    <javac srcdir="${src}" destdir="${build}" includeantruntime="true" />
   </target>
 
   <target name="clean" description="clean up">
     <delete dir="${build}"/>
   </target>
-  
+
   <target name="run" depends="compile">
       <java classname="test.Maintest" classpath="${build}" />
   </target>
