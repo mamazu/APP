@@ -7,7 +7,7 @@
   <property name="build" location="build"/>
   <property name="dist" location="dist"/>
 
-  <target name="init">
+  <target name="init" description="inits the build">
     <!-- Create the build directory structure used by compile -->
     <mkdir dir="${build}"/>
   </target>
@@ -17,11 +17,11 @@
     <javac srcdir="${src}" destdir="${build}" includeantruntime="true" />
   </target>
 
-  <target name="clean" description="clean up">
+  <target name="clean" description="Cleans up the build">
     <delete dir="${build}"/>
   </target>
 
-  <target name="run" depends="compile">
+  <target name="run" depends="compile" description="Runs the program">
       <java classname="test.Maintest" classpath="${build}" />
   </target>
 </project>

@@ -31,11 +31,11 @@ public class BinaryTree<E extends Comparable> extends AbstractCollection<E> impl
 	return parent;
     }
 
-    public BinaryTree getLeft() {
+    public BinaryTree getLeftBranch() {
 	return left;
     }
 
-    public BinaryTree getRight() {
+    public BinaryTree getRightBranch() {
 	return right;
     }
 
@@ -53,6 +53,11 @@ public class BinaryTree<E extends Comparable> extends AbstractCollection<E> impl
 	return new TreeItterator<BinaryTree>(this, false);
     }
 
+    /**
+     * Removes the current element form the tree
+     *
+     * @return True if successful, false otherwise
+     */
     public boolean remove() {
 	if (this == null) {
 	    return false;
@@ -71,9 +76,24 @@ public class BinaryTree<E extends Comparable> extends AbstractCollection<E> impl
     }
 
     //Abstract collection
+    /**
+     * Returns the size of the tree
+     *
+     * @return Size
+     */
     @Override
     public int size() {
 	return size(this);
+    }
+
+    /**
+     * Returns wheather the tree is empty or not
+     *
+     * @return True if empty false otherwise
+     */
+    @Override
+    public boolean isEmpty() {
+	return size(this) == 0;
     }
 
     /**
@@ -84,8 +104,8 @@ public class BinaryTree<E extends Comparable> extends AbstractCollection<E> impl
      * (didnt get added)
      */
     @Override
-    public boolean add(E value) {
-	return add(left, value);
+    public boolean add(E value) throws RuntimeException {
+	return add(this, value);
     }
 
     /**
@@ -95,7 +115,7 @@ public class BinaryTree<E extends Comparable> extends AbstractCollection<E> impl
      * @param value
      * @return
      */
-    private boolean add(BinaryTree tree, E value) {
+    private boolean add(BinaryTree tree, E value) throws RuntimeException {
 	switch (value.compareTo(this.value)) {
 	    case 1:
 		if (tree.right == null) {
@@ -110,26 +130,39 @@ public class BinaryTree<E extends Comparable> extends AbstractCollection<E> impl
 		}
 		return add(tree.left, value);
 	    default:
-		return false;
+		throw new RuntimeException("Element already in the tree");
 	}
     }
 
+    public BinaryTree find(E value) {
+	return find(this, value);
+    }
+
+    private BinaryTree find(BinaryTree tree, E value) {
+	if(tree == null){
+	    return null;
+	}
+	switch(this.value.compareTo(value)){
+	    case 1:
+		return find(tree.right, value);
+	    case -1:
+		return find(tree.left, value);
+	    default:
+		return tree;
+	}
+    }
+
+    /**
+     * Calculates the size of a subtree
+     *
+     * @param tree
+     * @return Size of the subtree
+     */
     public int size(BinaryTree tree) {
 	if (tree == null) {
 	    return 0;
 	}
 	return size(tree.left) + 1 + size(tree.right);
-    }
-
-    //Magic methods
-    /**
-     * Returns a string representation of the tree
-     *
-     * @return
-     */
-    @Override
-    public String toString() {
-	return "BinaryTree{" + '}';
     }
 
 }
