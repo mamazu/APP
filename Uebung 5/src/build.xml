@@ -1,0 +1,29 @@
+<project name="MyProject" default="run" basedir=".">
+  <description>
+    simple example build file
+  </description>
+  <!-- set global properties for this build -->
+  <property name="src" location="."/>
+  <property name="build" location="../build"/>
+  <property name="dist" location="../dist"/>
+
+  <target name="init" description="inits the build">
+    <!-- Create the build directory structure used by compile -->
+    <mkdir dir="${build}"/>
+  </target>
+
+  <target name="compile" depends="init" description="compile the source">
+    <!-- Compile the java code from ${src} into ${build} -->
+    <javac srcdir="${src}" destdir="${build}" includeantruntime="true" />
+  </target>
+
+  <target name="clean" description="Cleans up the build">
+    <delete dir="${build}"/>
+  </target>
+
+  <target name="run" depends="compile" description="Runs the program">
+      <java classname="AppDrawEvent" classpath="${build}">
+      <arg value="test" />
+  	</java>
+  </target>
+</project>
