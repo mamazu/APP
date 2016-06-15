@@ -10,10 +10,10 @@ public class ImageLoader{
 
 	/**
 	* Constructor of the image loader
-	* @param s String of the file name
+	* @param filepath String of the file name
 	**/
-	public ImageLoader(String s){
-		File f = new File(s);
+	public ImageLoader(String filepath){
+		File f = new File(filepath);
 		//If the file doesnt exist => error
 		if(!f.exists()){
 			JOptionPane.showMessageDialog(null, 
@@ -33,6 +33,9 @@ public class ImageLoader{
     			JOptionPane.ERROR_MESSAGE);
 		}
 	}
+
+	public int getHeight(){return img.getHeight();}
+	public int getWidth(){return img.getWidth();}
 
 	/**
 	* Gets the graphics object of the image

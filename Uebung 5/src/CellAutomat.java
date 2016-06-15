@@ -1,8 +1,20 @@
+import java.awt.*; 
+import java.awt.event.*; 
+import java.awt.image.*; 
+import javax.swing.*;
+import java.io.*;
+import javax.imageio.*;
+
 public class CellAutomat{
 	private boolean[][] board;
 	private int width, height;
 	private ImageLoader image;
 	private int time = 0;
+
+	public CellAutomat(){
+		width = 0;
+		height = 0;
+	}
 
 	public CellAutomat(int size){
 		board = new boolean[size][size];
@@ -18,7 +30,22 @@ public class CellAutomat{
 			}
 	}
 
-	private void setBoard(boolean[][] newBoard){
+	public int setPattern(String patternFile){
+		ImageLoader img = new ImageLoader(patternFile);
+		height= img.getHeight();
+		width = img.getWidth();
+		int[][] pixels = img.getPixels();
+		int cells = 0;
+		for(int i = 0; i < height; i++)
+			for(int j = 0; j < width; j++)
+				if(pixels[i][j] == Color.black.getRGB()){
+					board[i][j] = true;
+					cells++;
+				}
+		return cells;
+	}
+
+	public void setBoard(boolean[][] newBoard){
 		reset();
 		height = newBoard.length;
 		width = 0;
@@ -30,31 +57,34 @@ public class CellAutomat{
 		}
 	}
 
-	private void calcNext(){
+	public void calcNext(){
 		time++;
+		boolean[][] newBoard = new boolean[board.length][board[0].length];
 		for(int i=0; i < board.length; i++){
 			for(int j=0; j<board[i].length; j++){
 				int neighbours = countNeighbours(i, j);
-				board[i][j] = (neighbours % 2 == 1);
+				newBoard[i][j] = (neighbours % 2 == 1);
 			}
 		}
+		board = newBoard;
 	}
+
+	public boolean[][] getState(){return board;}
 
 	private int countNeighbours(int i, int j){
 		int count = 0;
 		for(int x = i - 1; x < i + 2; x++){
-			for (int y =j - 1; y < y + 2; y++) {
+			for (int y =j - 1; y < j + 2; y++) {
 				if(i==x && j==y)
 					continue;
-				count += (board[(height+i)%height][(width+j)%width])?1:0;
+				count += (board[(height+x)%height][(width+y)%width])?1:0;
 			}
 		}
 		return count;
 	}
 
-	public Dimension getSize(){
-		//int size = image.getDimension();
-		new Dimension();
+	public int getSize(){
+		return Math.max(width, height);
 	}
 
 }

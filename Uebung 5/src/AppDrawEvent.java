@@ -6,7 +6,11 @@ import java.io.*;
 import javax.imageio.*;
 
 class AppFrame extends JFrame { 
-	//Sets the tile and the default closing action
+	/**
+	* Constuctor of the AppFrame
+	* Sets the tile and the default closing action
+	* @param title Tile of the window
+	**/
     public AppFrame(String title) {
 		super(title);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -136,7 +140,7 @@ class AppDrawPanel extends JPanel {
 }
 
 public class AppDrawEvent{ 
-	//Main methog
+	//Main method
 	public static void main(String[] args) {
     	if(args.length != 1){
     		//Error message when no parameter is specified

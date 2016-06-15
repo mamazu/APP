@@ -29,6 +29,7 @@ public class APPExercise extends JFrame{
 	* @param filename of the image
 	**/
 	public void loadComponents(String fileName){
+		//Pannel to group the top elements
 		JPanel top = new JPanel();
 		panel.add(top);
 
