@@ -1,0 +1,313 @@
+package breakthroughPP.player.ai;
+
+import breakthroughPP.player.AbstractPlayer;
+import breakthroughPP.preset.Move;
+import breakthroughPP.preset.Position;
+import breakthroughPP.preset.Setting;
+import breakthroughPP.preset.Status;
+
+import java.util.ArrayList;
+import java.util.Random;
+
+/**
+ * Class AbstractAI
+ *
+ * @author Philipp Thurow
+ */
+
+public abstract class AbstractAI extends AbstractPlayer {
+	
+	private int blueFirstStone;
+	private int redFirstStone;
+	private int redLastStone;
+	private int blueLastStone;
+
+    /**
+     * Constructor for the AI if the board dimensions are known
+     */
+    public AbstractAI() {
+        super();
+    }
+
+    /**
+     * Method to calculate the situation to hit other stones , S(r) for the red stones
+     *
+     * @return calculation of the situation for red stones
+     */
+
+    public int hitRed() {
+        return (board.getRedCount() - board.getBlueCount());
+    }
+
+    /**
+     * Method to calculate the situation to hit other stones , S(b) for the blue stones
+     *
+     * @return calculation of the situation for blue stones
+     */
+
+    public int hitBlue() {
+        return (0 - hitRed());
+    }
+
+    /**
+     * Method to calculate how to break through the enemy lines as red C(r)
+     *
+     * @return calculation of the situation how to break through the enemy lines
+     */
+
+    public int breakRed() {
+        int zBlue = 0;
+        int zRed = 0; // zRed is the count of the columns where only red stones or empty fields are
+        int colBlueNow = 0;
+        int colRedNow = 0; // count of blue and red stones in the actual column
+        for (int j = 0; j < board.WIDTH; j++) {
+            for (int i = 0; i < board.HEIGHT; i++) {
+                if (board.getMap()[i][j] == 0) {
+                    colRedNow = colRedNow + 1;	
+                }
+                if (board.getMap()[i][j] == 1) {
+                    colBlueNow = colBlueNow + 1;
+                }
+            }
+            if (colRedNow > 0 && colBlueNow == 0) {
+                zRed = zRed + 1;
+            }
+            if (colBlueNow > 0 && colRedNow == 0) {
+                zBlue = zBlue + 1;
+            }
+            colBlueNow = colRedNow = 0;
+        }
+        return (zRed - zBlue);
+    }
+
+    /**
+     * Method to calculate how to break through the enemy lines as blue C(b)
+     *
+     * @return calculation of the situation how to break through the enemy lines as blue
+     */
+
+    public int breakBlue() {
+        return (0 - breakRed());
+    }
+
+    /**
+     * Method to calculate the situation how close to the baseline of blue the closest red stone is F(r)
+     *
+     * @return calculation of the situation how close to the baseline of blue the closest red stone is
+     */
+
+    public int baseRed() {
+        int xRed = board.HEIGHT - 1;
+        int xBlue = board.HEIGHT - 1;
+        for (int i = 0; i < board.HEIGHT; i++) {
+            for (int j = 0; j < board.WIDTH; j++) {
+                if (board.getMap()[i][j] == 0 && (board.HEIGHT - i - 1) < xRed) {
+                    xRed = board.HEIGHT - i - 1;
+                }
+                if (board.getMap()[i][j] == 1 && (i) < xBlue) {
+                    xBlue = i;
+                }
+            }
+        }
+        return (xBlue - xRed);
+    }
+
+    /**
+     * Method to calculate the situation how close to the baseline of red the closest blue stone is F(b)
+     *
+     * @return calculation of the situation how close to the baseline of red the closest blue stone is
+     */
+
+    public int baseBlue() {
+        return (0 - baseRed());
+    }
+
+    /**
+     * Method to calculate the situation overall for red
+     *
+     * @return calculation of the situation overall for the actual board for red
+     */
+
+    public int overRed() {
+        return (baseRed() + 2 * hitRed() + 5 * breakRed());
+    }
+
+    /**
+     * Method to calculate the situation overall for blue
+     *
+     * @return calculation of the situation overall for the actual board for blue
+     */
+
+    public int overBlue() {
+        return (baseBlue() + 2 * hitBlue() + 5 * breakBlue());
+    }
+
+    /**
+     * Method to test if there is a winning move possible for the actual player , if not null getting returned
+     *
+     * @param colorNow the color of the moving player
+     * @return a winning move or null if there is none
+     */
+    protected Move getWinningMove(int colorNow) {
+        int blueNow = board.getBlueCount();
+        int redNow = board.getRedCount();
+        int blueNext;
+        int redNext;
+        ArrayList<Move> now = board.getPossibleMoves(colorNow);
+        for (Move aMove : now) {
+            if (!board.executeMove(aMove))
+                continue;
+            blueNext = board.getBlueCount();
+            redNext = board.getRedCount();
+            Status statNext = board.checkStatus();
+            switch (colorNow) {
+                case Setting.BLUE:
+                    if (statNext.getStatus() == Setting.BLUE_WIN) {
+                        undoMove(aMove, blueNow, blueNext, redNow, redNext);
+                        return aMove;
+                    }
+                case Setting.RED:
+                    if (statNext.getStatus() == Setting.RED_WIN) {
+                        undoMove(aMove, blueNow, blueNext, redNow, redNext);
+                        return aMove;
+                    }
+            }
+            undoMove(aMove, blueNow, blueNext, redNow, redNext);
+        }
+        return null;
+    }
+	
+	/**
+	*	Method to find a possible capture move
+	*
+	*	@param colorNow 	color of the actual player
+	*	@return a capture move or null if there is none
+	*/
+	
+	protected Move getCaptureMove(int colorNow)	{
+		int blueNow = board.getBlueCount();
+		int redNow = board.getRedCount();
+		int blueNext;
+		int redNext;
+		ArrayList<Move> now = board.getPossibleMoves(colorNow);
+		for(Move aMove : now){
+			if(!board.executeMove(aMove))
+				continue;
+			blueNext = board.getBlueCount();
+			redNext = board.getRedCount();
+			if(colorNow == Setting.RED && blueNext < blueNow){
+				undoMove(aMove , blueNow , blueNext , redNow , redNext);
+				return aMove;
+			}
+			if(colorNow == Setting.BLUE && redNext < redNow){
+				undoMove(aMove , blueNow , blueNext , redNow , redNext);
+				return aMove;
+			}
+			undoMove(aMove , blueNow , blueNext , redNow , redNext);
+		}
+		return null;
+	}
+	
+	/**
+	* Method to find a free stone , that can run to the enemy baseline without problems
+	*
+	*	@param colorNow color of the actual player
+	*	@return a move for a free stone or null if there is none
+	*/
+	
+	protected Move getFreeMove(int colorNow){
+		Random rand = new Random();
+		updateFirstAndLast();
+		if(redFirstStone <= blueLastStone + 1 && colorNow == Setting.RED){
+			for(int j = 0 ; j < board.WIDTH ; j++)
+                if (board.getMap()[redFirstStone][j] == Setting.RED) {
+                    ArrayList<Move> redNow = board.getMovesForField(redFirstStone, j, Setting.RED);
+                    int n = rand.nextInt(redNow.size());
+                    Move moveNow = redNow.get(n);
+                    return moveNow;
+                }
+		}
+		if(blueFirstStone >= redLastStone - 1 && colorNow == Setting.BLUE){
+			for(int j = 0 ; j < board.WIDTH ; j++){
+				if(board.getMap()[blueFirstStone][j] == Setting.BLUE){
+					ArrayList<Move> blueNow = board.getMovesForField(blueFirstStone , j ,  Setting.BLUE);
+					int n = rand.nextInt(blueNow.size());
+                    return blueNow.get(n);
+				}
+			}
+		}
+		return null;
+	}
+	
+	/**
+	*	Method to update the first and last stones of each 
+	*
+	*/
+	
+	private void updateFirstAndLast(){
+		redFirstStone = board.HEIGHT - 1;
+		redLastStone = 0;
+		blueFirstStone = 0;
+		blueLastStone = board.HEIGHT - 1;
+		for(int i = 0; i < board.HEIGHT ; i++){
+			for(int j = 0 ; j < board.WIDTH ; j++){
+				if(board.getMap()[i][j] == Setting.RED && i < redFirstStone){
+					redFirstStone = i;
+				}
+				if(board.getMap()[i][j] == Setting.RED && i > redLastStone){
+					redLastStone = i;
+				}
+				if(board.getMap()[i][j] == Setting.BLUE && i > blueFirstStone){
+					blueFirstStone = i;
+				}
+				if(board.getMap()[i][j] == Setting.BLUE && i < blueLastStone){
+					blueLastStone = i;
+				}
+			}
+		}
+	}
+
+    /**
+     * Method to undo moves
+     *
+     * @param m        {@link Move} that should be undone
+     * @param blueNow  number of blue pieces before the move
+     * @param blueNext number of blue pieces after the move
+     * @param redNow   number of red pieces before the move
+     * @param redNext  number of red pieces after the move
+     */
+    protected void undoMove(Move m, int blueNow, int blueNext, int redNow, int redNext) {
+        Position end = m.getEnd();
+        Position start = m.getStart();
+        if (end.getLetter() > start.getLetter() || end.getLetter() < start.getLetter()) {
+            if ((end.getNumber() > start.getNumber()) && blueNext < blueNow) {
+                board.setPlayer(end, Setting.BLUE);
+                board.incrementBlue();
+                board.setPlayer(start, Setting.RED);
+            }
+            if ((end.getNumber() > start.getNumber()) && blueNext == blueNow) {
+                board.setPlayer(end, Setting.NONE);
+                board.setPlayer(start, Setting.RED);
+            }
+            if ((end.getNumber() < start.getNumber()) && redNext < redNow) {
+                board.setPlayer(end, Setting.RED);
+                board.incrementRed();
+                board.setPlayer(start, Setting.BLUE);
+            }
+            if ((end.getNumber() < start.getNumber()) && redNext == redNow) {
+                board.setPlayer(end, Setting.NONE);
+                board.setPlayer(start, Setting.BLUE);
+            }
+        } else {
+            if (end.getNumber() > start.getNumber()) {
+                board.setPlayer(end, Setting.NONE);
+                board.setPlayer(start, Setting.RED);
+            } else {
+                board.setPlayer(end, Setting.NONE);
+                board.setPlayer(start, Setting.BLUE);
+            }
+        }
+        board.changePlayer();
+    }
+
+}

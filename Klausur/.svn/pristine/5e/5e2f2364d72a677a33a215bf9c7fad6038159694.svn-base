@@ -1,0 +1,201 @@
+package breakthroughPP.gui;
+
+import breakthroughPP.Game;
+import breakthroughPP.SplinterTheOmniscientRat;
+import breakthroughPP.preset.Position;
+import breakthroughPP.preset.PresetException;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.border.EmptyBorder;
+
+public class MenuGUI extends JFrame implements WindowListener, ActionListener{
+	private final static String PLAYER = "Player";
+	private final static String NETWORK = "Network player";
+	private final static String AI_RANDOM = "AI - Random";
+	private final static String AI_EASY = "AI - Easy";
+	private final static String AI_HARD = "AI - Hard";
+
+	/**
+	* Action event listener for user interface items
+	*/
+	public void actionPerformed(ActionEvent e) {
+		Object source = e.getSource();
+		if(source==playerOneBox){
+			boolean enable = playerOneBox.getSelectedItem()==NETWORK;
+			rmiOne.setEnabled(enable);
+			rmiOneLabel.setForeground(enable?Color.BLACK:Color.GRAY);
+		}else if(source==playerTwoBox){
+			boolean enable = playerTwoBox.getSelectedItem()==NETWORK;
+			rmiTwo.setEnabled(enable);
+			rmiTwoLabel.setForeground(enable?Color.BLACK:Color.GRAY);
+		}else if(source==launchButton){
+			launchButton.setEnabled(false);
+			SwingUtilities.invokeLater(new Runnable(){
+			@Override public void run(){
+				Game game = null;
+				try{
+					game = new Game(true, width.getValue(), height.getValue(), comboboxToPlayerConstant(playerOneBox), comboboxToPlayerConstant(playerTwoBox), rmiOne.getText(), rmiTwo.getText());
+					width.setText(String.valueOf(game.width));
+					height.setText(String.valueOf(game.height));
+				}catch(PresetException ex){
+					JOptionPane.showMessageDialog(thisgui, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+					launchButton.setEnabled(true);
+					return;
+				}
+				game.setAiTurnDelay(aiTurnDelay.getValue());
+				final Game gamefinal = game;
+				new Thread(){
+				@Override public void run(){
+					try{
+						if(gamefinal.play(-1)==Game.PLAY_ERROR)
+							gamefinal.shutdown();
+					}catch(PresetException ex){
+						System.err.println("game.play error: "+ex.getMessage());
+					}
+					launchButton.setEnabled(true);
+				}}.start();
+			}});
+		}
+	}
+	
+	private final JComboBox<String> playerOneBox, playerTwoBox;
+	private final DefaultIntField width, height, aiTurnDelay;
+	private final JTextField rmiOne, rmiTwo;
+	private final JLabel rmiOneLabel, rmiTwoLabel;
+	private final JButton launchButton;
+	private final MenuGUI thisgui;
+
+	/**
+	* Create a graphical menu for AGoS
+	*/
+	public MenuGUI(){
+		super("A Game of Stones");
+		thisgui = this;
+		setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+		addWindowListener(this);
+		setLayout(new FlowLayout(FlowLayout.LEFT));
+		
+		JPanel main = new JPanel();
+		main.setBorder(new EmptyBorder(4, 4, 4, 4));
+        main.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+		gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 1;
+        gbc.weighty = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+		
+		JLabel headerimg = new JLabel(new ImageIcon(SplinterTheOmniscientRat.get("agos.png")));
+		JPanel headerpanel = new JPanel();
+		headerpanel.add(headerimg);
+		main.add(headerpanel, gbc);
+		
+		gbc.gridy++;
+		JPanel playerOnePanel = new JPanel();
+		playerOneBox = new JComboBox<String>();
+		playerOnePanel.add(combobox(playerOneBox));
+		rmiOneLabel = new JLabel("rmi://");
+		rmiOneLabel.setForeground(Color.GRAY);
+		playerOnePanel.add(rmiOneLabel);
+		rmiOne = new JTextField("host/red", 25);
+		rmiOne.setEnabled(false);
+		playerOnePanel.add(rmiOne);
+		main.add(playerOnePanel, gbc);
+
+		gbc.gridy++;
+
+		JPanel playerTwoPanel = new JPanel();
+		playerTwoBox = new JComboBox<String>();
+		playerTwoPanel.add(combobox(playerTwoBox));
+		rmiTwoLabel = new JLabel("rmi://");
+		rmiTwoLabel.setForeground(Color.GRAY);
+		playerTwoPanel.add(rmiTwoLabel);
+		rmiTwo = new JTextField("host/blue", 25);
+		rmiTwo.setEnabled(false);
+		playerTwoPanel.add(rmiTwo);
+		main.add(playerTwoPanel, gbc);
+
+
+		gbc.gridy++;
+		JPanel sizePanel = new JPanel();
+		int maxSize = Position.getAlphabet().length();
+		sizePanel.add(new JLabel("Board size: "));
+		width = new DefaultIntField(" Width ", 1, maxSize);
+		sizePanel.add(width);
+		sizePanel.add(new JLabel("x"));
+		height = new DefaultIntField(" Height ", 1, maxSize);
+		sizePanel.add(height);
+		sizePanel.add(new JLabel(" (2x6 to 26x26)"));
+		main.add(sizePanel, gbc);
+		
+		
+		gbc.gridy++;
+		gbc.anchor = GridBagConstraints.EAST;
+		gbc.fill = GridBagConstraints.NONE;
+		JPanel launcherPanel = new JPanel();
+		aiTurnDelay = new DefaultIntField(" Turn delay ms ", 0, 5000);
+		launcherPanel.add(aiTurnDelay, gbc);
+		launchButton = new JButton("Launch game");
+		launchButton.addActionListener(this);
+		launcherPanel.add(launchButton);
+		main.add(launcherPanel, gbc);
+		add(main);
+	}
+	
+	/**
+	* Adds player item Strings to the combobox
+	* @param playerbox Combobox to extend
+	*/
+	private JPanel combobox(JComboBox<String> playerbox){
+		JPanel player = new JPanel(new FlowLayout(FlowLayout.LEFT));
+		playerbox.addItem(PLAYER);
+		playerbox.addItem(NETWORK);
+		playerbox.addItem(AI_RANDOM);
+		playerbox.addItem(AI_EASY);
+		playerbox.addItem(AI_HARD);
+		playerbox.addActionListener(this);
+		player.add(playerbox);
+		return player;
+	}
+	
+	/**
+	* Retrieve matching Game.PLAYER_* constant for selected combobox item
+	* @param box Combobox to check
+	*/
+	private int comboboxToPlayerConstant(JComboBox<String> box){
+		switch(box.getSelectedItem().toString()){
+		case PLAYER:
+			return Game.PLAYER_GRAPHIC;
+		case NETWORK:
+			return Game.PLAYER_NETWORK;
+		case AI_RANDOM:
+			return Game.PLAYER_AIRANDOM;
+		case AI_EASY:
+			return Game.PLAYER_AIEASY;
+		case AI_HARD:
+			return Game.PLAYER_AIHARD;
+		default:
+			return Game.PLAYER_ISNOPLAYER;
+		}
+	}
+
+	/**
+	* Close window
+	*/
+	public void windowClosing(WindowEvent e){
+		if(!launchButton.isEnabled())
+			if (JOptionPane.showConfirmDialog(this, "There is still a game instance running.\nTerminate?",
+				"Close AGoS", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE)!=JOptionPane.YES_OPTION)
+            	return;
+        System.exit(0);
+	}
+	public void windowOpened(WindowEvent e) {}
+	public void windowActivated(WindowEvent e) {}
+	public void windowIconified(WindowEvent e) {}
+	public void windowDeiconified(WindowEvent e) {}
+	public void windowDeactivated(WindowEvent e) {}
+	public void windowClosed(WindowEvent e) {}
+}
+

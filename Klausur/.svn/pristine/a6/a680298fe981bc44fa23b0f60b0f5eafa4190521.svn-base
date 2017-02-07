@@ -1,0 +1,115 @@
+package breakthroughPP.player;
+
+import breakthroughPP.SplinterTheOmniscientRat;
+import breakthroughPP.Game;
+import breakthroughPP.preset.NetPlayer;
+import breakthroughPP.preset.Status;
+import breakthroughPP.preset.Move;
+import breakthroughPP.player.AbstractPlayer;
+import breakthroughPP.gui.GUI;
+
+import java.net.MalformedURLException;
+import java.rmi.Naming;
+import java.rmi.RemoteException;
+
+import breakthroughPP.preset.Setting;
+
+/**
+ * A game of stones Network player
+ * This class is a wrapper for the Player class and provides additional networking functionality with fixed GUI
+ *
+ * @author mamazu
+ */
+public class StonedNetPlayer extends NetPlayer {
+	private GUI gui;
+	private Game game;
+	private AbstractPlayer aplayer;
+	public final String address;
+	private boolean addressFreed = false;
+	
+    /**
+     * Constructor for the StonedNetPlayer
+     * @param player Raw {@link Player} object
+     * @param gui User interface for refreshing purposes
+     * @param game Game instance for refreshing purposes
+     * @param address RMI address
+     * @throws RemoteException if a remote error occours
+     */
+    public StonedNetPlayer(AbstractPlayer player, GUI gui, Game game, String address) throws RemoteException {
+        super(player);
+        aplayer = player;
+        this.gui = gui;
+        this.address = address;
+    }
+    
+	/**
+	 * Updates the players board
+	 * @param opponentMove Move of the opponent
+	 * @param boardStatus Status of the board
+	 * @throws Exception if an error occours
+	 * @throws RemoteException if a remote error occours
+	 */
+	public void update(Move opponentMove, Status boardStatus) throws Exception, RemoteException {
+		super.update(opponentMove, boardStatus);
+		if(gui!=null) gui.refresh();
+		if(!boardStatus.isOk())
+			endgame(boardStatus);
+	}
+
+	/**
+	 * Confirms the board status
+	 * @param boardStatus Status of the board	
+	 * @throws Exception if an error occours
+	 * @throws RemoteException if a remote error occours
+	 */
+	public void confirm(Status boardStatus) throws Exception, RemoteException {
+		super.confirm(boardStatus);
+		if(gui!=null) gui.refresh();
+		if(!boardStatus.isOk())
+			endgame(boardStatus);
+	}
+	
+	/**
+	 * Initialises the player
+	 * @param dimX width of the board
+	 * @param dimY height of the board
+	 * @param color Color of the player
+	 * @throws Exception if an error occours
+	 * @throws RemoteException if a remote error occours
+	 */
+    public void init(int dimX, int dimY, int color) throws Exception, RemoteException {
+		super.init(dimX, dimY, color);
+		if(gui!=null) gui.setViewer(aplayer.getViewer());
+	}
+	
+	/**
+	* Attempts to end game
+	* @param status Supplied board status
+	*/
+	public void endgame(Status status){
+		freeaddress();
+		//TODO shutdown frees this object. working?
+		//remote Game being garbage collected?
+		if(game!=null)
+			game.shutdown();
+		else if(gui!=null)
+			gui.gameEnded("Game Over: "+String.valueOf(status));
+		//else
+		//	throw new Exception("game and gui garbage collected?!");
+	}
+	
+	/**
+	* Attempts to unbind address from RMI host
+	*/
+	public void freeaddress(){
+		if(addressFreed)return;
+		addressFreed = true;
+		try{
+    		Naming.unbind("rmi://"+address);
+    	}catch(Exception e){
+    		if(SplinterTheOmniscientRat.DEBUG)
+    			System.err.println("Unbinding failed: "+e.getMessage());
+    	}
+	}
+}
+

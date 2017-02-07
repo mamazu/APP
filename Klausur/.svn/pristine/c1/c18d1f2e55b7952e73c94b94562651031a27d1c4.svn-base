@@ -1,0 +1,37 @@
+package breakthroughPP.player;
+
+import breakthroughPP.preset.Requestable;
+import breakthroughPP.preset.Move;
+import breakthroughPP.preset.PresetException;
+
+/**
+ * Layover for AbstractPlayer to allow human interaction
+ */
+public class HumanPlayer extends AbstractPlayer {
+    private Requestable ui;
+
+    /**
+     * Creates an object for human game interaction
+     * @param x Width of the board
+     * @param y Height of the board
+     * @param color Color of the player
+     * @param useri Requestable bject to request moves from
+     */
+    public HumanPlayer(Requestable useri) {
+        super();
+        ui = useri;
+    }
+	
+    /**
+     * Returns the move the player made
+     * @return Returns the {@link Move} a player has made
+     */
+    @Override
+    public Move getMove() throws PresetException{
+        try{
+        	return ui.deliver();
+        }catch(Exception e){
+        	throw new PresetException(e.getMessage());
+        }
+    }
+}

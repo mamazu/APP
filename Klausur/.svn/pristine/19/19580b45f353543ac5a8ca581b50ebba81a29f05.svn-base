@@ -1,0 +1,285 @@
+package breakthroughPP;
+
+import breakthroughPP.gui.ConsoleBoardUI;
+import breakthroughPP.gui.GUI;
+import breakthroughPP.map.Board;
+import breakthroughPP.preset.Exceptions.InvalidOrderException;
+import breakthroughPP.preset.*;
+
+import breakthroughPP.player.HumanPlayer;
+import breakthroughPP.player.StonedNetPlayer;
+import breakthroughPP.player.ai.RandomPlayer;
+//import breakthroughPP.player.ai.EasyAI;
+import breakthroughPP.player.ai.HardAI;
+import breakthroughPP.preset.Exceptions.StatusException;
+
+import java.util.Scanner;
+import java.rmi.RemoteException;
+
+public class Game {
+    public static final int PLAY_FINISHED = 0;
+    public static final int PLAY_ERROR = 122;
+    public static final int PLAY_INVALID = 123;
+
+    public final static int PLAYER_ISNOPLAYER = 1337;
+    public final static int PLAYER_CONSOLE = 4200;
+    public final static int PLAYER_GRAPHIC = 4201;
+    public final static int PLAYER_NETWORK = 4202;
+    public final static int PLAYER_AIRANDOM = 4210;
+    public final static int PLAYER_AIEASY = 4211;
+    public final static int PLAYER_AIHARD = 4212;
+
+    private static final Status statusIllegal = new Status(Setting.ILLEGAL);
+    private final Object lock = new Object();
+    public final int height, width;
+    private Board board;
+    private Player red, blue;
+    private ConsoleBoardUI cbui;
+    private GUI gui;
+    private int aiTurnDelay = 0;
+    private boolean forcedShutdown = false;
+    private boolean shutdownCalled = false;
+    
+    /**
+    * Initializes a new game instance
+    * @param createUI Whether or not to create a GUI, if false Stdout is used
+    * @param width Width of the game
+    * @param height Height of the game
+    * @param red Player type for red, must be value of Game.PLAYER_*
+    * @param blue Player type for blue, must be value of Game.PLAYER_*
+    */
+    public Game(boolean createUI, int width, int height, int red, int blue) throws PresetException {
+        this(createUI, width, height);
+        if(createUI) waitforui();
+        this.red = createPlayer(red, Setting.RED, null);
+        this.blue = createPlayer(blue, Setting.BLUE, null);
+    }
+    
+    /**
+    * Initializes a new game instance with netplayer initialization ability
+    * @param createUI Whether or not to create a GUI, if false Stdout is used
+    * @param width Width of the game
+    * @param height Height of the game
+    * @param red Player type for red, must be value of Game.PLAYER_*
+    * @param blue Player type for blue, must be value of Game.PLAYER_*
+    * @param redRMI RMI path to use if red is a network player, ignored otherwise
+    * @param blueRMI RMI path to use if blue is a network player, ignored otherwise
+    */
+    public Game(boolean createUI, int width, int height, int red, int blue, String redRMI, String blueRMI) throws PresetException {
+        this(createUI, width, height);
+        if(createUI) waitforui();
+        this.red = createPlayer(red, Setting.RED, redRMI);
+        this.blue = createPlayer(blue, Setting.BLUE, blueRMI);
+    }
+	
+	/**
+	* Basic game initialization, private use only
+	* @param createUI Create new GUI
+	* @param w Width
+	* @param h Height
+	*/
+    private Game(boolean createUI, int w, int h) throws PresetException {
+        board = new Board(h, w);//Size min/max handled in board
+        width = board.WIDTH;
+        height= board.HEIGHT;
+        board.debug(SplinterTheOmniscientRat.DEBUG);
+        final Viewer view = board.getViewer();
+        cbui = new ConsoleBoardUI(view);
+        if (createUI)
+            new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException e) {
+                        System.err.println("Could not sleep");
+                    }
+                    gui = new GUI(view);
+                    synchronized (lock) {
+                        lock.notify();
+                    }
+                }
+            }.start();
+        else gui = null;
+    }
+
+    /**
+    * Waits for lock to be notified
+    */
+    private void waitforui(){
+        synchronized (lock) {
+            try {
+                lock.wait();
+            } catch (InterruptedException e) {
+                System.err.println("Game initialization: wait was interrupted");
+            }
+        }
+    }
+
+    /**
+     * Set AI turn delay
+     *
+     * @param ms Min delay between AI turns in milliseconds
+     */
+    public void setAiTurnDelay(int ms) {
+        aiTurnDelay = ms;
+    }
+
+    /**
+     * Initializes specified player object
+	 * @param which Player type, instance of PLAYER_* constant
+	 * @param color Player color as in preset.Setting
+	 * @param extra Extra information for player object
+     */
+    private Player createPlayer(int which, int color, String extra) throws PresetException {
+        switch (which) {
+        case PLAYER_CONSOLE:
+            return new HumanPlayer(width, height, color, cbui);
+        case PLAYER_GRAPHIC:
+            if (gui == null)
+                throw new PresetException("No GUI to create graphical player");
+            return new HumanPlayer(width, height, color, gui);
+        //case PLAYER_NETWORK:
+            //TODO: implement that
+        case PLAYER_AIRANDOM:
+        	return new RandomPlayer(width, height, color);
+    	//case PLAYER_AIEASY:
+    		//TODO easy ai?
+    	case PLAYER_AIHARD:
+    		return new HardAI(width, height, color);
+    	case PLAYER_ISNOPLAYER:
+    		if(gui!=null) gui.gameEnded("Error");
+    		throw new PresetException("PLAYER_ISNOPLAYER was supplied to createPlayer");
+        default:
+        	if(gui!=null) gui.gameEnded("Error");
+            throw new PresetException("Unknown player type requested");
+        }
+    }
+
+    /**
+     * Play rounds Rounds
+     *
+     * @param rounds Number of rounds to play, -1 for indefinite
+     * @return If the game is finished or invalid.
+     */
+    public int play(int rounds) throws PresetException {
+        if (rounds < -1 || rounds == 0)
+            return PLAY_INVALID;
+        while (--rounds != 0 && board.checkStatus().isOk()) {
+            Player turn, opposite;
+            if (board.getCurrentPlayer() == Setting.RED) {
+                turn = red;
+                opposite = blue;
+            } else {
+                turn = blue;
+                opposite = red;
+            }
+            try {
+            	forcedShutdown = true;
+                Move move;
+                int counter = 5;
+                boolean execmove;
+                long waitUntil = System.currentTimeMillis()+aiTurnDelay;
+                do {
+                    move = turn.request();
+                    execmove = true;
+                    if (move == null && gui == null) {
+                        Scanner scanner = new Scanner(System.in);
+                        try {
+                            System.out.print("Are you sure you want to surrender and loose this game? (y)es/(n)o\n> ");
+                            //surrenderloop: do{
+                            String s = scanner.nextLine().toLowerCase();
+                            switch (s) {
+                                case "y":
+                                case "yes":
+                                case "j":
+                                case "ja":
+                                    break;// surrenderloop;
+                                case "n":
+                                case "no":
+                                case "nein":
+                                default: //everything else continues game
+                                    execmove = false;
+                                    break;// surrenderloop;
+                            }
+                            //	System.out.print("Please type (y)es or (n)o\n> ");
+                            //}while(true);
+                        } catch (Exception e) {
+                            if (SplinterTheOmniscientRat.DEBUG)
+                                e.printStackTrace();
+                            System.err.println("Error: Scanner error. Is STDIN still alive?");
+                            return PLAY_ERROR;
+                        }
+                    }
+
+                    if (execmove && board.executeMove(move)) {
+                    	{//Turn delay, especially for AI
+                    		long diff = waitUntil-System.currentTimeMillis();
+                    		if(diff>0) Thread.sleep(diff);
+                    	}
+                        Status status = board.checkStatus();
+                        turn.confirm(status);
+                        opposite.update(move, status);
+                        if (gui != null) gui.refresh();
+                        break;
+                    } else {
+                        if (SplinterTheOmniscientRat.DEBUG)
+                            System.err.println("Invalid move: " + move);
+                        turn.confirm(statusIllegal);
+                    }
+                    cbui.draw();
+                } while (counter-- > 0);
+                if (counter <= 0) {
+                    //TODO TOO MANY TRIES
+                    System.err.println("PLAYER MOVES INVALID");
+                }
+                forcedShutdown = false;
+            } catch (InvalidOrderException e) {
+                e.printStackTrace(System.err);
+                System.err.println("THIS WAS PROGRAMMED FUCKING WRONG");
+                return PLAY_ERROR;
+            } catch (RemoteException e) {
+                if (SplinterTheOmniscientRat.DEBUG)
+                    e.printStackTrace(System.err);
+                else System.err.println("A remote error occurred during the game :/");
+                return PLAY_ERROR;
+            } catch (StatusException e) {
+                if (SplinterTheOmniscientRat.DEBUG)
+                    e.printStackTrace(System.err);
+                else System.err.println("Status of the board doesnt match with players :/");
+                return PLAY_ERROR;
+            } catch (Exception e) {
+                if (SplinterTheOmniscientRat.DEBUG)
+                    e.printStackTrace(System.err);
+                else System.err.println("An error occurred during the game :/");
+                return PLAY_ERROR;
+            }
+        }
+        if(!board.checkStatus().isOk())
+        	shutdown();
+        return PLAY_FINISHED;
+    }
+    
+    /**
+    * Does game postprocessing and displays end game state
+    */
+    public void shutdown(){
+    	if(shutdownCalled)return;
+    	shutdownCalled = true;
+    	String gameover;
+    	try{
+    		Status stat = board.checkStatus();
+        	gameover = "Game over - " + Setting.statusString[stat.getStatus()];
+        }catch(PresetException e){
+        	gameover = "Game over - Unknown game state";
+        }
+        if (gui == null) {
+            if(!forcedShutdown)
+            	cbui.draw();
+            System.out.println(gameover);
+        } else {
+        	gui.gameEnded(gameover);
+            gui.refresh();
+        }
+    }
+}

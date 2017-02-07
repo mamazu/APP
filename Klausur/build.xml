@@ -1,0 +1,59 @@
+<project name="A game of stones" default="dist" basedir=".">
+    <!-- set global properties for this build -->
+    <property name="src" location="src"/>
+    <property name="build" location="build"/>
+    <property name="dist" location="dist"/>
+    <property name="doc" location="doc"/>
+    <property name="asset" location="raw" />
+
+    <target name="compile" description="Compile the source">
+        <mkdir dir="${build}"/>
+        <!-- Compiling -->
+        <javac includeantruntime="false" destdir="${build}">
+            <compilerarg value="-Xlint:unchecked"/>
+            <src path="${src}"/>
+        </javac>
+        <!-- Copying the assets -->
+        <copy todir="${build}/raw">
+            <fileset dir="${asset}"/>
+        </copy>
+    </target>
+
+    <target name="javadoc" description="Generates the documentation">
+        <!-- Creates the documentation -->
+        <mkdir dir="${doc}"/>
+        <javadoc destdir="${doc}" author="true" version="true" private="true" package=".">
+            <fileset dir="src">
+                <!-- Including all java files into the documentation -->
+                <include name="**/*.java"/>
+            </fileset>
+        </javadoc>
+    </target>
+
+    <target name="dist" depends="compile" description="generate the distribution">
+        <!-- Create the distribution directory -->
+        <mkdir dir="${dist}"/>
+
+        <!-- Put everything in ${build} into the agameofstones.jar file -->
+        <jar jarfile="${dist}/agameofstones.jar" basedir="${build}">
+            <manifest>
+                <!-- Sets the main class file -->
+                <attribute name="Main-Class" value="breakthroughPP.SplinterTheOmniscientRat"/>
+            </manifest>
+        </jar>
+    </target>
+
+    <target name="clean" description="Cleans up prior builds and jar files">
+        <delete dir="${build}"/>
+        <delete dir="${dist}"/>
+    </target>
+
+    <target name="deepClean" description="deletes everything except the sourcecode" depends="clean">
+        <delete dir="${doc}"/>
+    </target>
+
+    <target name="run" depends="dist" description="Runs the default interface">
+        <!-- Complies and runs the breakthrough console version -->
+        <java jar="${dist}/agameofstones.jar" fork="true"/>
+    </target>
+</project>

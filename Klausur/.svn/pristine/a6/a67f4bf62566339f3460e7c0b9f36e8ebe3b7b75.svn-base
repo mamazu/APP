@@ -1,0 +1,330 @@
+package breakthroughPP.map;
+
+import breakthroughPP.SplinterTheOmniscientRat;
+import breakthroughPP.preset.*;
+
+import java.util.ArrayList;
+
+/**
+ * Class for generating board and save the situation on the board
+ *
+ * @author Philipp Thurow , reviewed Max Pesche
+ */
+
+public class Board implements Viewable {
+
+    //color that moves upwards
+    public static final int MOVESUP = Setting.RED;
+    //color that moves downwards
+    public static final int MOVESDOWN = Setting.BLUE;
+    // height and width of the board
+    public final int HEIGHT;
+    public final int WIDTH;
+    //shows which players turn it is
+    private int player;
+    //shows how much stones everyone has left
+    private int countRed;
+    private int countBlue;
+    //shows the situation on the board , RED = 0 , BLUE = 1 , NONE = 2 (see settings)
+    private int[][] map;
+
+    /**
+     * constructor
+     *
+     * @param height HEIGHT of the board
+     * @param width  WIDTH of the board
+     */
+
+    public Board(int height, int width) {
+
+        HEIGHT = Math.max(height, 6) % 27;
+        WIDTH = Math.max(width, 2) % 27;
+        map = new int[HEIGHT][WIDTH];
+        init();
+    }
+
+    /**
+     * constructor
+     *
+     * @param height HEIGHT of the board
+     * @param width  WIDTH of the board
+     * @param color  int of the player
+     */
+
+    public Board(int height, int width, int color) {
+        this(height, width);
+        setPlayer(color);
+    }
+
+    private void init() {
+        int k = (3 + HEIGHT) / 4;
+        countBlue = countRed = k * WIDTH;
+        for (int b = 0; b < WIDTH; b++) {
+            for (int a = 0; a < HEIGHT; a++) {
+                if (a < k) {
+                    map[a][b] = Setting.BLUE;
+                } else if (a < HEIGHT - k) {
+                    map[a][b] = Setting.NONE;
+                } else {
+                    map[a][b] = Setting.RED;
+                }
+            }
+        }
+    }
+
+    /**
+     * Method to get map array
+     *
+     * @return board of the game
+     */
+
+    public int[][] getMap() {
+        return map;
+    }
+
+    /**
+     * Method to get count of the red stones
+     *
+     * @return count of the red stones on the field
+     */
+
+    public int getRedCount() {
+        return countRed;
+    }
+
+    /**
+     * Method to get count of the blue stones
+     *
+     * @return count of the blue stones on the field
+     */
+
+    public int getBlueCount() {
+        return countBlue;
+    }
+
+    /**
+     * Method to update the count of the red stones - 1
+     */
+
+    public void decrementRed() {
+        countRed = countRed - 1;
+    }
+
+
+    /**
+     * Method to update the count of the blue stones - 1
+     */
+
+    public void decrementBlue() {
+        countBlue = countBlue - 1;
+    }
+
+    /**
+     * Method to update the count of red stones + 1
+     */
+
+    public void incrementRed() {
+        countRed = countRed + 1;
+    }
+
+    /**
+     * Method to update the count of blue stones + 1
+     */
+
+    public void incrementBlue() {
+        countBlue = countBlue + 1;
+    }
+
+    /**
+     * retrieve a viewer to display game board
+     */
+
+    public Viewer getViewer() {
+        return new BoardViewer(this);
+    }
+
+    /**
+     * Method to get player at the position
+     *
+     * @param pos Position that should be acquired
+     * @return player or 2 for NONE
+     */
+
+    public int getPlayer(Position pos) {
+        return map[HEIGHT - pos.getNumber() - 1][pos.getLetter()];
+    }
+
+    /**
+     * Method to set the player
+     *
+     * @param color Color of the player
+     */
+    private void setPlayer(int color) {
+        this.player = color % 3;
+    }
+
+    /**
+     * Method to set a field to a player
+     *
+     * @param pos   which field to change
+     * @param color Color of the player
+     */
+
+    public void setPlayer(Position pos, int color) {
+        map[HEIGHT - pos.getNumber() - 1][pos.getLetter()] = color;
+    }
+
+    /**
+     * Method to change the player
+     */
+
+    public void changePlayer() {
+        this.player = (player + 1) % 2;
+    }
+
+    /**
+     * Method to get which players turn it is
+     *
+     * @return player
+     */
+
+    public int getCurrentPlayer() {
+        return player;
+    }
+
+    /**
+     * Method for move
+     *
+     * @param m move object from start to end
+     * @return was the move executed
+     */
+
+    public boolean executeMove(Move m) {
+        int playerNow = this.getCurrentPlayer();
+        if (m == null && playerNow == Setting.BLUE) {
+            countBlue = 0;
+            return true;
+        }
+        if (m == null && playerNow == Setting.RED) {
+    		countRed = 0;
+            return true;
+        }
+        if (this.checkMove(m.getStart(), m.getEnd(), playerNow)) {
+            setPlayer(m.getStart(), Setting.NONE);
+            if (getPlayer(m.getEnd()) == Setting.RED) {
+                decrementRed();
+            }
+            if (getPlayer(m.getEnd()) == Setting.BLUE) {
+                decrementBlue();
+            }
+            setPlayer(m.getEnd(), playerNow);
+            if (SplinterTheOmniscientRat.DEBUG)
+                System.out.println("Move executed: " + Setting.colorString[playerNow] + " " + m);
+            changePlayer();
+            return true;
+        } else
+            return false;
+    }
+
+    /**
+     * Method for check the move
+     *
+     * @param start position of the start
+     * @param end   position of the end
+     * @return is the move possible
+     */
+    public boolean checkMove(Position start, Position end, int playerNow) {
+        int deltaX = end.getLetter() - start.getLetter();
+        int deltaY = end.getNumber() - start.getNumber();
+        //Checks if the starting position is the same as the player
+        boolean currentPlayer = (getPlayer(start) == playerNow);
+        //Checks if the player is blue and moves down or red and moves up
+        boolean direction = (deltaY == -1 && playerNow == Setting.BLUE) || (deltaY == 1 && playerNow == Setting.RED);
+        //Checks if the user can move straight up
+        boolean moveAhead = (deltaX == 0 && getPlayer(end) == Setting.NONE);
+        //Checks side movement
+        boolean moveSideways = (deltaX == 1 || deltaX == -1);
+        //Checks if the destination is free
+        boolean isSideFree = (getPlayer(end) == Setting.NONE || getPlayer(end) == (playerNow + 1) % 2);
+        //Returning value. Isn't that obvious?
+        return currentPlayer && direction && (moveAhead || (moveSideways && isSideFree));
+    }
+
+    /**
+     * Method for checking the status
+     *
+     * @return stat Status of the game
+     */
+
+    public Status checkStatus() {
+        Status stat = new Status(Setting.OK);
+        int countRedFirst = 0; // Counter for Red stones on blue baseline
+        int countBlueFirst = 0; // Counter for Blue stones on red baseline
+        for (int j = 0; j < WIDTH; j++) {
+            if (map[HEIGHT - 1][j] == Setting.BLUE) {
+                countBlueFirst = countBlueFirst + 1;
+            }
+            if (map[0][j] == Setting.RED) {
+                countRedFirst = countRedFirst + 1;
+            }
+        }
+        if ((countBlueFirst == 1 && countRedFirst == 0) || getRedCount() == 0) { // There are blue stones at red baseline and no red on blue baseline or red has no stones anymore
+            if(SplinterTheOmniscientRat.DEBUG)
+                System.out.println("countBlueFirst = " + countBlueFirst + " countRedFirst = " + countRedFirst + " countRed =" + countRed + " countBlue = " + countBlue);
+            stat.setStatus(Setting.BLUE_WIN);
+        }
+        if ((countRedFirst == 1 && countBlueFirst == 0) || getBlueCount() == 0) {
+            if(SplinterTheOmniscientRat.DEBUG)
+                System.out.println("countBlueFirst = " + countBlueFirst + " countRedFirst = " + countRedFirst + " countRed =" + countRed + " countBlue = " + countBlue);
+            stat.setStatus(Setting.RED_WIN);
+        }
+        if (countBlueFirst > 1 || countRedFirst > 1 || (countRedFirst == 1 && countBlueFirst == 1)) {
+            stat.setStatus(Setting.ILLEGAL);
+        }
+        return stat;
+    }
+
+    /**
+     * method to get all possible moves on the board
+     *
+     * @param player which players turn it is
+     * @return Move {@link ArrayList} all possible moves for the player
+     */
+
+    public ArrayList<Move> getPossibleMoves(int player) {
+        ArrayList<Move> possibleMoves = new ArrayList<>();
+        for (int i = 0; i < map.length; i++) {
+            for (int j = 0; j < map[i].length; j++) {
+                if (map[i][j] != player) continue;
+                possibleMoves.addAll(getMovesForField(i, j, player));
+            }
+        }
+        return possibleMoves;
+    }
+
+    /**
+     * Method to get the possible moves for a single field
+     *
+     * @param y      number of the field
+     * @param x      letter of the field
+     * @param player color of the player
+     */
+
+    private ArrayList<Move> getMovesForField(int y, int x, int player) {
+        ArrayList<Move> result = new ArrayList<>();
+        int start = Math.max(0, x - 1);
+        int end = Math.min(map[0].length - 1, x + 1);
+        int dir = (player == Setting.RED) ? -1 : +1;
+        for (int i = start; i <= end; i++) {
+            if (i == x && map[y + dir][x] != Setting.NONE) continue;
+            if (i != x && map[y + dir][i] == player) continue;
+            try {
+                result.add(new Move(new Position(x, HEIGHT - y - 1), new Position(i, HEIGHT - (y + dir) - 1)));
+            } catch (Exception ignored) {
+                System.err.println("Could not create move");
+            }
+        }
+        return result;
+    }
+
+}

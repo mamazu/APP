@@ -1,0 +1,120 @@
+package breakthroughPP.player;
+
+import breakthroughPP.SplinterTheOmniscientRat;
+import breakthroughPP.map.Board;
+import breakthroughPP.preset.Exceptions.InvalidOrderException;
+import breakthroughPP.preset.*;
+
+/**
+ * Class AbstractPlayer
+ * player that implements the basic functionality of a player based on the interface {@link Player}
+ *
+ * @author Max Pesch
+ */
+
+public abstract class AbstractPlayer implements Player {
+
+    protected Board board;
+    protected int color;
+    private int stage = -1;
+    private Move lastMove;
+
+    /**
+     * Creates the {@link Board} with dimensions given
+     */
+    public AbstractPlayer() {
+        super();
+    }
+
+    /**
+     * Get a viewer object for player board
+     *
+     * @return Viewer
+     */
+    public Viewer getViewer() {
+        return board.getViewer();
+    }
+
+    /**
+     * Requests a new player from the current move and stores that in the
+     * last move and waits for confirm approval.
+     *
+     * @return Returns the {@link Move} object
+     * @throws Exception             if the function was called in the wrong order
+     * @throws InvalidOrderException If the player isn't in the request state.
+     */
+    @Override
+    public Move request() throws Exception {
+        if (stage != 0)
+            throw new InvalidOrderException("Can't request more moves");
+        //Sets the stage
+        stage = 1;
+        for (int i = 0; i < 10; i++) {
+            lastMove = getMove();
+            if (board.checkMove(lastMove))
+                return lastMove;
+        }
+        if (SplinterTheOmniscientRat.DEBUG)
+            System.err.println("10 invalid moves given - " + Setting.colorString[color] + " surrenders");
+        return null;
+    }
+
+    /**
+     * Confirms the last move depending on the board status.
+     *
+     * @param boardStatus Current {@link Status} of the board
+     * @throws Exception             Exception thrown by {@link Player}
+     * @throws InvalidOrderException If the player isn't in the confirm state.
+     */
+    @Override
+    public void confirm(Status boardStatus) throws Exception {
+        if (stage != 1)
+            throw new InvalidOrderException("Can't confirm the current move");
+        if (boardStatus.isOk() || boardStatus.isRedWin() || boardStatus.isBlueWin()) {
+            stage = 2;
+            board.executeMove(lastMove);
+        } else
+            stage = 0;
+    }
+
+    /**
+     * Updates the executes the move if the last move was accepted and the {@link Status} is okay.
+     *
+     * @param opponentMove Move of the opponent
+     * @param boardStatus  Current status of the {@link Board}
+     * @throws Exception             Exception thrown by {@link Player}
+     * @throws InvalidOrderException If the player isn't in the update state.
+     */
+    @Override
+    public void update(Move opponentMove, Status boardStatus) throws Exception {
+        if (stage != 2)
+            throw new InvalidOrderException("Can't update the board with an opponent move");
+        stage = 0;
+        if (boardStatus.isOk() || boardStatus.isRedWin() || boardStatus.isBlueWin()) {
+            board.executeMove(opponentMove);
+            if (!boardStatus.equals(board.checkStatus()))
+                throw new Exception("Status doesn't match");
+        }
+    }
+
+    /**
+     * Initializes the board with the given dimensions
+     *
+     * @param dimX  Width of the {@link Board}
+     * @param dimY  Height of the {@link Board}
+     * @param color Color of the {@link Player}
+     */
+    @Override
+    public void init(int dimX, int dimY, int color) {
+        board = new Board(dimY, dimX);
+        stage = (color == Setting.RED) ? 0 : 2;
+        this.color = color;
+    }
+
+    /**
+     * Gets a move from the player. Which has to be implemented in the subclasses
+     *
+     * @return Move made
+     */
+    public abstract Move getMove() throws PresetException;
+}

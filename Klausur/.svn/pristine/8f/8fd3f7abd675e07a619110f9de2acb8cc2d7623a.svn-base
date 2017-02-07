@@ -1,0 +1,104 @@
+package breakthroughPP.map;
+
+import breakthroughPP.preset.*;
+
+/**
+ * Class to use to retrieve board displaying information
+ *
+ * @author faulersack
+ */
+public class BoardViewer implements Viewer {
+    private Board board;
+
+    /**
+     * Initialize BoardViewer
+     *
+     * @param board Gameboard object to use
+     */
+    public BoardViewer(Board board) {
+        this.board = board;
+    }
+
+    /**
+     * Which player to make next turn
+     *
+     * @return Setting.RED or Setting.BLUE to make next move
+     */
+    public int turn() {
+        return board.getCurrentPlayer();
+    }
+
+    /**
+     * Get board width
+     *
+     * @return Width of Board
+     */
+    public int getDimX() {
+        return board.WIDTH;
+    }
+
+    /**
+     * Get board height
+     *
+     * @return Height of Board
+     */
+    public int getDimY() {
+        return board.HEIGHT;
+    }
+    
+    /**
+     * Retrieve field information; 0|0 bottom left
+     * @param pos Position of the field
+     * @return Color of the specified field, Setting.NONE when out of bounds
+     */
+    public int getColor(Position pos){
+        return getColor(pos.getLetter(), pos.getNumber());
+    }
+    
+    /**
+     * Retrieve field information; 0|0 bottom left
+     *
+     * @param num Number of the field
+
+     * @param let Letter of the field
+     * @return Color of the specified field, Setting.NONE when out of bounds
+     */
+    public int getColor(int let, int num){
+        return getRawAtXY(let, getDimY()-num-1);
+    }
+    
+    /**
+     * Retrieve field information; 1|1 bottom left
+     *
+     * @param num Number of the field
+     * @param let Letter of the field
+     * @return Color of the specified field, Setting.NONE when out of bounds
+     */
+    public int getColorAt(int let, int num){
+        return getRawAtXY(let-1, getDimY()-num);
+    }
+
+    /**
+     * Retrieve field information; 0|0 top left
+     *
+     * @param x X of the field
+     * @param y Y of the field
+     * @return Color of the specified field, Setting.NONE when out of bounds
+     */
+    public int getRawAtXY(int x, int y) {
+        return (x >= 0 && x < getDimX() && y >= 0 && y < getDimY()) ? board.getMap()[y][x] : Setting.NONE;
+    }
+
+    /**
+     * Get current board status
+     *
+     * @return Board status
+     */
+    public Status getStatus() throws PresetException {
+        return board.checkStatus();
+    }
+
+    public boolean checkMove(Position start, Position end, int playerNow) {
+        return board.checkMove(start, end, playerNow);
+    }
+}

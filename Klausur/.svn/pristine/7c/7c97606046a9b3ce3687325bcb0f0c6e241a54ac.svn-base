@@ -1,0 +1,68 @@
+package breakthroughPP.player;
+
+import breakthroughPP.SplinterTheOmniscientRat;
+import breakthroughPP.preset.NetPlayer;
+import breakthroughPP.preset.Player;
+
+import java.net.MalformedURLException;
+import java.rmi.Naming;
+import java.rmi.RemoteException;
+
+/**
+ * A game of stones Network player
+ * This class is a wrapper for the Player class and provides additional networking functionality
+ *
+ * @author mamazu
+ */
+public class StonedNetPlayer extends NetPlayer {
+
+    private final String name;
+
+    /**
+     * Constructor for the NetPlayer
+     *
+     * @param player Raw {@link Player} object
+     * @throws RemoteException if an error occurs
+     */
+    public StonedNetPlayer(Player player, String name) throws RemoteException {
+        super(player);
+        this.name = name;
+        offer(name);
+    }
+
+    /**
+     * Finds a player in the RMI
+     *
+     * @param host string of the host machine
+     * @param name name of the player
+     * @return Returns a {@link Player} object
+     */
+    public static Player find(String host, String name) {
+        AbstractPlayer p = null;
+        try {
+            p = (AbstractPlayer) Naming.lookup("rmi:// " + host + "/" + name);
+            System.out.println(" player (" + name + ") found ");
+        } catch (Exception ex) {
+            if(SplinterTheOmniscientRat.DEBUG)
+                ex.printStackTrace();
+            else System.err.println(ex.getMessage());
+        }
+        return p;
+    }
+
+    /**
+     * Registers a player at the RMI
+     *
+     * @param host address of the RMI
+     */
+    private void offer(String host) {
+        try {
+            Naming.rebind("rmi:// " + host + "/" + name, this);
+            System.out.println(" player (" + name + ") ready ");
+        } catch (MalformedURLException | RemoteException ex) {
+            if(SplinterTheOmniscientRat.DEBUG)
+                ex.printStackTrace();
+            else System.err.println("Remote exception");
+        }
+    }
+}

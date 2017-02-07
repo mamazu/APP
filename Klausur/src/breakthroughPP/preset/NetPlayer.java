@@ -1,0 +1,66 @@
+package breakthroughPP.preset;
+
+import java.rmi.*;
+import java.rmi.server.UnicastRemoteObject;
+import java.net.*;
+
+import breakthroughPP.preset.*;
+
+public class NetPlayer extends UnicastRemoteObject implements Player {
+	/**
+	 * Constructor for the NetPlayer
+	 * 
+	 * @param player Raw {@link Player} object
+	 * @throws RemoteException if an error occours
+	 */
+	public NetPlayer(Player player) throws RemoteException {
+		this.player = player;
+	}
+
+	/**
+	 * Requests a Move form the player
+	 * 
+	 * @throws Exception if an error occours
+	 * @throws RemoteException if an error occours
+	 * @return Move
+	 */
+	public Move request() throws Exception {
+		return player.request();
+	}
+
+	/**
+	 * Updates the players board
+	 * @param opponentMove Move of the opponent
+	 * @param boardStatus Status of the board
+	 * @throws Exception if an error occours
+	 * @throws RemoteException if an error occours
+	 */
+	public void update(Move opponentMove, Status boardStatus) throws Exception {
+		player.update(opponentMove, boardStatus);
+	}
+
+	/**
+	 * Confirms the board status
+	 * @param boardStatus Status of the board	
+	 * @throws Exception if an error occours
+	 * @throws RemoteException if an error occours
+	 */
+	public void confirm(Status boardStatus) throws Exception {
+		player.confirm(boardStatus);
+	}
+
+	/**
+	 * Initialises the board
+	 * @param dimX width of the board
+	 * @param dimY height of the board
+	 * @param color Color of the player
+	 * @throws Exception if an error occours
+	 * @throws RemoteException if an error occours
+	 */
+	public void init(int dimX, int dimY, int color) throws Exception {
+		player.init(dimX, dimY, color);
+	}
+
+	// ---------------------------------------------
+	private Player player;
+}

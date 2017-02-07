@@ -1,0 +1,167 @@
+package breakthroughPP.player.ai;
+
+import breakthroughPP.preset.*;
+
+import java.util.ArrayList;
+import java.util.Random;
+
+public class HardAI extends AbstractAI {
+
+    /**
+     * Constructor for the HardAI if the board dimensions are known
+     *
+     * @param width  width of the board
+     * @param height height of the board
+     * @param color  color of the player
+     */
+
+    public HardAI(int width, int height, int color) {
+        super(width, height, color);
+    }
+
+    @Override
+    public Move getMove() throws PresetException {
+        return getNextMove();
+    }
+
+    /**
+     * Method to get a list of moves that got calculated ahead
+     *
+     * @return ArrayList with Moves that the HardAI wants to go
+     */
+
+    private ArrayList<Move> calcGoodMoves() {
+        int colorNow = board.getCurrentPlayer();
+        ArrayList<Move> minMax = new ArrayList<>(); // final array with the maximum value moves of the min values
+        ArrayList<Integer> minForMove = new ArrayList<>();    // min value for the specific first move
+        int minMaxValue = -10000;
+        ArrayList<Move> secondMove;
+        ArrayList<Move> firstMove = board.getPossibleMoves(board.getCurrentPlayer());
+        for (int i = 0; i < firstMove.size(); i++) {
+            if (!board.executeMove(firstMove.get(i))) continue;
+            int min = 10000;
+            secondMove = board.getPossibleMoves(board.getCurrentPlayer());
+            for (Move aSecondMove : secondMove) {
+                if (!board.executeMove(aSecondMove)) continue;
+                if (colorNow == Setting.BLUE && (overBlue() < min)) {
+                    min = overBlue();
+                    minForMove.add(overBlue());
+                } else if (colorNow == Setting.RED && (overRed() < min)) {
+                    min = overRed();
+                    minForMove.add(overRed());
+                }
+                undoMove(aSecondMove);
+            }
+            undoMove(firstMove.get(i));
+        }
+        for (int i = 0; i < minForMove.size(); i++) {
+            if (minMaxValue == minForMove.get(i)) {
+                minMax.add(firstMove.get(i));
+            }else if (minMaxValue < minForMove.get(i)) {
+                minMaxValue = minForMove.get(i);
+                minMax.clear();
+                minMax.add(firstMove.get(i));
+            }
+        }
+        return minMax;
+    }
+
+    /**
+     * Method to test if there is a winning move possible for the actual player , if not null getting returned
+     *
+     * @param colorNow , the color of the moving player
+     * @return Move , a winning move or null if there is none
+     */
+
+    private Move getWinningMove(int colorNow) throws PresetException {
+        ArrayList<Move> now = board.getPossibleMoves(colorNow);
+        for (Move aMove : now) {
+            if (!board.executeMove(aMove))
+                continue;
+            Status statNext = board.checkStatus();
+            switch (colorNow) {
+                case Setting.BLUE:
+                    if (statNext.getStatus() == Setting.BLUE_WIN) {
+                        undoMove(aMove);
+                        return aMove;
+                    }
+                case Setting.RED:
+                    if (statNext.getStatus() == Setting.RED_WIN) {
+                        undoMove(aMove);
+                        return aMove;
+                    }
+            }
+            undoMove(aMove);
+        }
+        return null;
+    }
+
+    /**
+     * Method to get a winning move or a random next move out of the calculated good moves and when possible
+     * not a move that possibly make the enemy win next move
+     *
+     * @return move that the hard AI wants to go
+     */
+
+    public Move getNextMove() throws PresetException {
+        int colorNow = board.getCurrentPlayer();
+        Random rand = new Random();
+        Move moveNow = getWinningMove(colorNow);
+        ArrayList<Move> now = calcGoodMoves();
+        ArrayList<Move> betterMoves = new ArrayList<>();
+        if (moveNow != null) {
+            return moveNow;
+        }
+        for (Move aMove : now) {
+            if (!board.executeMove(aMove)) continue;
+            Move moveNext = getWinningMove(board.getCurrentPlayer());
+            if (moveNext == null) {
+                betterMoves.add(aMove);
+            }
+            undoMove(aMove);
+        }
+        if (!betterMoves.isEmpty()) {
+            int n = rand.nextInt(betterMoves.size());
+            return betterMoves.get(n);
+        }
+        int n = rand.nextInt(now.size());
+        moveNow = now.get(n);
+        return moveNow;
+    }
+
+    /**
+     * Method to undo moves on the board
+     *
+     * @param m move object from end to start
+     */
+
+
+    private void undoMove(Move m) {
+        Position end = m.getEnd();
+        Position start = m.getStart();
+        if (end.getLetter() > start.getLetter() && end.getLetter() < start.getLetter()) {
+            if (end.getNumber() > start.getNumber()) {
+                board.setPlayer(end, Setting.BLUE);
+                board.incrementBlue();
+                board.setPlayer(start, Setting.RED);
+                board.changePlayer();
+            } else {
+                board.setPlayer(end, Setting.RED);
+                board.incrementRed();
+                board.setPlayer(start, Setting.BLUE);
+                board.changePlayer();
+            }
+        } else {
+            if (end.getNumber() > start.getNumber()) {
+                board.setPlayer(end, Setting.NONE);
+                board.setPlayer(start, Setting.RED);
+                board.changePlayer();
+            } else {
+                board.setPlayer(end, Setting.NONE);
+                board.setPlayer(start, Setting.BLUE);
+                board.changePlayer();
+            }
+        }
+    }
+
+}

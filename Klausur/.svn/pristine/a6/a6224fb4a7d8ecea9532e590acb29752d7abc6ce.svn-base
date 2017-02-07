@@ -1,0 +1,38 @@
+package breakthroughPP.player.ai;
+
+import breakthroughPP.preset.Move;
+
+import java.util.ArrayList;
+import java.util.Random;
+
+public class RandomPlayer extends AbstractAI {
+
+    private Random rand = new Random();
+
+    /**
+     * Constructor for the RandomPlayer if the board dimensions are known
+     *
+     * @param width  width of the board
+     * @param height height of the board
+     * @param color  color of the player
+     */
+
+    public RandomPlayer(int width, int height, int color) {
+        super(width, height, color);
+    }
+
+    /**
+     * Method to get a random generated possible move for the easy AI
+     *
+     * @return Move that the easy AI wants to go
+     */
+
+    @Override
+    public Move getMove() {
+        ArrayList<Move> now = board.getPossibleMoves(board.getCurrentPlayer());
+        int n = rand.nextInt(now.size());
+        return now.get(n);
+    }
+
+}
+

@@ -1,0 +1,75 @@
+package breakthroughPP.gui;
+
+import javax.swing.*;
+import javax.swing.event.*;
+import java.awt.event.*;
+
+/**
+* Textfield for integer range with helper text
+* @author faulersack
+*/
+public class DefaultIntField extends JTextField implements FocusListener, DocumentListener{
+	private int min, max, lastvalid;
+	private String text;
+	
+	/**
+	* Create DefaultIntField
+	* @param text Default text value
+	* @param min Allowed minimum int value
+	* @param max Allowed maximum int value
+	*/
+	public DefaultIntField(String text, int min, int max){
+		super(text);
+		if(min>max){int m = max;max = min;min = m;}
+		this.min = this.lastvalid = min;
+		this.max = max;
+		this.text = text;
+		addFocusListener(this);
+		getDocument().addDocumentListener(this);
+	}
+	
+	/**
+	* Retrieve current value
+	* @returns Int value
+	*/
+	public int getValue(){
+		return lastvalid;
+	}
+	
+	public void insertUpdate(DocumentEvent e){checkValue(e);}
+	public void removeUpdate(DocumentEvent e){checkValue(e);}
+	public void changedUpdate(DocumentEvent e){checkValue(e);}
+	private void checkValue(DocumentEvent e){
+		if(getText().equals("")||getText().equals(text))
+			return;
+		int newvalue;
+		boolean forceupdate = false;
+		try{
+			newvalue = Integer.parseInt(getText());
+			if(newvalue<min&&lastvalid!=min)
+				newvalue = min;
+			else if(newvalue>max&&lastvalid!=max)
+				newvalue = max;
+		}catch(Exception ex){
+			newvalue = lastvalid;
+			forceupdate = true;
+		}
+		if(forceupdate||newvalue!=lastvalid){
+			SwingUtilities.invokeLater(new Runnable(){
+			@Override public void run(){
+				setText(String.valueOf(lastvalid));
+			}});
+		}
+		lastvalid = newvalue;
+	}
+	
+	public void focusGained(FocusEvent e){
+		if(getText().equals(text))
+			setText("");
+	}
+	public void focusLost(FocusEvent e){
+		if(getText().equals(""))
+			setText(text);
+	}
+}
+

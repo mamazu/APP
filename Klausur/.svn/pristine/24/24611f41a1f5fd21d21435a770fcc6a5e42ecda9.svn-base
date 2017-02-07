@@ -1,0 +1,496 @@
+package breakthroughPP.gui;
+
+import breakthroughPP.SplinterTheOmniscientRat;
+import breakthroughPP.map.Board;
+import breakthroughPP.preset.*;
+
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import javax.imageio.ImageIO;
+
+/**
+* Graphical user interface for AGoS
+* @author faulersack
+*/
+public class GUI extends JFrame implements /*WindowListener, ActionListener,*/ Requestable {	
+	private static Icon iconSurrender;
+	private static Image stoneRed, stoneRedL, stoneBlue, stoneBlueL, movesUpL, movesDownL;
+	private static Image killStone;
+	private static boolean imagesloaded = false;
+	private static Font font;
+	private static Color DARKRED = new Color(139,0,0), NAVY = new Color(0,0,128);
+	private static String[] alphabet;
+	
+	private boolean hasEnded = false;
+    private final int xcount, ycount, width, height;
+    private final Object lock = new Object();
+    private Viewer viewer;
+    private GUIPanel panel;
+    
+    /**
+    * Initializes a graphical game interface
+    * @param viewer Viewer to use for requesting game state
+    */
+    public GUI(Viewer viewer) {
+        super("A Game of Stones");
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        setLayout(new BorderLayout());
+        
+        if(!imagesloaded)
+        	loadImages();
+
+        panel = new GUIPanel(this);
+        Mouse m = new Mouse(this);
+        panel.addMouseListener(m);
+        add(panel, BorderLayout.CENTER);
+        this.viewer = viewer;
+
+        xcount = (width = viewer.getDimX()) + 2;
+        ycount = (height = viewer.getDimY()) + 2 + 1;
+        {
+            int w, h, sw, sh;
+            Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+            sw = (int) screen.getWidth();
+            sh = (int) screen.getHeight();
+            w = xcount * recommendedSize(viewer.getDimX());
+            h = ycount * recommendedSize(viewer.getDimY());
+            if (w > sw || h > sh) {
+                float f;
+                if (w / sw > h / sh)
+                    f = sw / w;
+                else f = sh / h;
+                h = Math.max((int) ((float) h * f), ycount * 16);
+                w = Math.max((int) ((float) w * f), xcount * 16);
+            }
+            setSize(w, h);
+        }
+        setVisible(true);
+    }
+    
+    /**
+    * Returns recommended size for single cell for given count of total cells
+    * @param count Cell count
+    */
+    private static int recommendedSize(int count) {
+        if (count <= 10) return 64;
+        if (count <= 16) return 48;
+        return 32;
+    }
+    
+    /**
+    * Loads required image files
+    */
+    private synchronized void loadImages(){
+    	imagesloaded = true;
+    	iconSurrender = new ImageIcon(SplinterTheOmniscientRat.get("surrendercat_icon.png"));
+    	//try{
+    	//	font = Font.createFont(Font.TRUETYPE_FONT, new File(SplinterTheOmniscientRat.get("agos.ttf").getPath()));
+    		//INFO: NO NUMBERS IN agos.ttf
+    		//ALSO: FILE DOESNT READ FROM JAR
+    	//}catch(Exception e){
+    		font = new JLabel().getFont();
+    	//}
+    	alphabet = new String[Position.getAlphabet().length()];
+    	for(int i=0;i<Position.getAlphabet().length();i++)
+    		alphabet[i] = String.valueOf(Position.getAlphabet().charAt(i));
+    	stoneRed = getOvalImage(Color.RED, "red.png");
+		stoneRedL = getOvalImage(Color.YELLOW, "red_hl.png");
+		stoneBlue = getOvalImage(Color.BLUE, "blue.png");
+		stoneBlueL = getOvalImage(Color.CYAN, "blue_hl.png");
+		if(Setting.RED==Board.MOVESUP){
+			movesUpL = stoneRedL;movesDownL = stoneBlueL;
+		}else{
+			movesDownL = stoneRedL;movesUpL = stoneBlueL;
+		}
+		killStone = getOvalImage(Color.BLACK, "delete.png");
+    }
+    
+    /**
+    * Tries to load image or creates one
+    * @param cl Color to create default if loading from file fails
+    * @param name Filename of image
+    * @return The image
+    */
+    private Image getOvalImage(Color cl, String name){
+    	try{
+    		return ImageIO.read(SplinterTheOmniscientRat.get(name));
+    	}catch(IOException e){
+			Image img = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
+			Graphics g = img.getGraphics();
+			g.setColor(cl);
+			g.fillOval(0, 0, 128, 128);
+			return img;
+		}
+    }
+
+    //public void actionPerformed(ActionEvent e) {
+    //    System.out.println("action performed");
+    //}
+    
+    /**
+    * Draw board again
+    */
+    public void refresh() {
+        panel.refresh();
+    }
+    
+    /**
+    * Finalize displayed game state and disable further Move requests
+    * @param text Text to display
+    */
+    public void gameEnded(String text) {
+        panel.messageLabel.setText(text);
+        panel.closeButton.setVisible(true);
+        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        hasEnded = true;
+    }
+
+    /**
+     * Request viewer-supplies current user to make move via GUI
+     *
+     * @return Move the user chose, null when aborted
+     */
+    public Move deliver() throws PresetException {
+        return deliver(viewer.turn());
+    }
+
+    /**
+     * Request user to make move via console
+     *
+     * @param color The color of the player to make move
+     * @return Move the user chose, null when aborted
+     */
+    public Move deliver(int color) throws PresetException {
+        if(hasEnded)
+        	return null;
+        panel.request(color);
+        panel.refresh();
+        try {
+            synchronized (lock) {
+                lock.wait();
+            }
+            panel.requestReset();
+            return panel.requestMove;
+        } catch (InterruptedException e) {
+            throw new PresetException("Couldnt return Move, because wait was interrupted");
+        }
+    }
+    
+    /**
+    * Returns color at Position using own viewer object
+    * @param pos Position to check
+    * @return Color at position
+    */
+    public int colorAt(Position pos){
+    	return viewer.getColor(pos.getLetter(), pos.getNumber());
+    }
+
+	/*public void windowClosing(WindowEvent e) {
+        dispose(0);//System.exit(0);
+	}
+	public void windowOpened(WindowEvent e) {}
+	public void windowActivated(WindowEvent e) {}
+	public void windowIconified(WindowEvent e) {}
+	public void windowDeiconified(WindowEvent e) {}
+	public void windowDeactivated(WindowEvent e) {}
+	public void windowClosed(WindowEvent e) {}*/
+	
+	/**
+	* Subclass to display 
+	*/
+    private class GUIPanel extends JPanel {
+        public final JLabel messageLabel;
+        public final JButton closeButton, surrenderButton;
+        private final GUI parent;
+        public Position currentSelection = null;
+        public int cellWidth, cellHeight;
+        public Move requestMove = null;
+        private int requestColor = Setting.NONE;
+
+        public GUIPanel(GUI par) {
+            super();
+
+            this.parent = par;
+
+            setLayout(new BorderLayout());
+
+            JPanel align = new JPanel();
+
+            align.setLayout(new GridBagLayout());
+            align.setBorder(new EmptyBorder(4, 6, 4, 6));
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = gbc.gridy = 0;
+            gbc.weightx = gbc.weighty = 1;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.gridwidth = GridBagConstraints.REMAINDER;
+
+            messageLabel = new JLabel("test");
+            align.add(messageLabel);
+            align.add(new JLabel("  "));
+
+            Insets smallPadding = new Insets(-1, 2, -1, 2);
+            closeButton = new JButton("Close");
+            Font smallFont = closeButton.getFont().deriveFont(12f);
+            closeButton.setMargin(smallPadding);
+            closeButton.setFont(smallFont);
+            closeButton.setVisible(false);
+            closeButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    parent.dispatchEvent(new WindowEvent(parent, WindowEvent.WINDOW_CLOSING));
+                }
+            });
+            align.add(closeButton);
+            surrenderButton = new JButton("Surrender");
+            surrenderButton.setMargin(smallPadding);
+            surrenderButton.setFont(smallFont);
+            surrenderButton.setVisible(false);
+            surrenderButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (JOptionPane.showConfirmDialog(parent, "Surrender and lose this game?", "Surrender",
+                    	JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, iconSurrender) != JOptionPane.YES_OPTION)
+                        return;
+                    if (requestColor() != Setting.NONE) {
+                        requestMove = null;
+                        requestReset();
+                        synchronized (parent.lock) {
+                            parent.lock.notify();
+                        }
+                    }
+                }
+            });
+            align.add(surrenderButton);
+
+            add(align, BorderLayout.SOUTH);
+
+            setBackground(Color.GRAY);
+        }
+
+        public void request(int color) {
+            if (color != Setting.RED & color != Setting.BLUE)
+                return;
+            currentSelection = null;
+            requestColor = color;
+            surrenderButton.setVisible(true);
+            messageLabel.setText("Make " + Setting.colorString[color] + " move");
+        }
+
+        public void requestReset() {
+            if (requestColor == Setting.NONE)
+                return;
+            requestColor = Setting.NONE;
+            surrenderButton.setVisible(false);
+            messageLabel.setText("A Game of Stones");
+        }
+
+        public int requestColor() {
+            return requestColor;
+        }
+
+        public void refresh() {
+            repaint();
+        }
+
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            g.setFont(GUI.font.deriveFont(cellHeight/2f));
+            cellWidth = ((int) getSize().getWidth()) / parent.xcount;
+            cellHeight = ((int) getSize().getHeight()) / parent.ycount;
+            ((Graphics2D)g).setStroke(new BasicStroke(parent.xcount>15||parent.ycount>15?2:3));
+            {//Draw standard
+		        int x, y = 0;
+		        for (int i = 0; i < parent.height; i++) {
+		            x = 0;
+		            y += cellHeight;
+		            g.drawString(String.valueOf(height-i), x+cellWidth/4, y+(2*cellHeight)/3);
+		            g.drawString(String.valueOf(height-i), (width+1)*cellWidth+cellWidth/2, y+(2*cellHeight)/3);
+		            for (int j = 0; j < parent.width; j++) {
+		                x += cellWidth;
+		                switch (parent.viewer.getRawAtXY(j, i)) {
+		                case Setting.RED:
+		                	//g.setColor(Color.RED);
+		                    //g.fillOval(x, y, cellWidth, cellHeight);
+		                    g.drawImage(stoneRed, x, y, cellWidth, cellHeight, null);
+		                    break;
+		                case Setting.BLUE:
+		                	//g.setColor(Color.BLUE);
+		                    //g.fillOval(x, y, cellWidth, cellHeight);
+		                    g.drawImage(stoneBlue, x, y, cellWidth, cellHeight, null);
+		                    break;
+		                case Setting.WHITE:
+		                	g.setColor(Color.WHITE);
+		                    g.fillOval(x, y, cellWidth, cellHeight);
+		                    break;
+		                case Setting.GRAY:
+		                	g.setColor(Color.GRAY);
+		                    g.fillOval(x, y, cellWidth, cellHeight);
+		                    break;
+		                default:
+		                }
+		                g.setColor(Color.BLACK);
+		                g.drawRect(x, y, cellWidth, cellHeight);
+		            }
+		        }
+		        x = cellWidth/3;
+		        int ytop = (3*cellHeight)/4;
+		        y = (height+1)*cellHeight+ytop;
+		        for (int j = 0; j < parent.width; j++) {
+		        	x+= cellWidth;
+		        	g.drawString(alphabet[j], x, ytop);
+		            g.drawString(alphabet[j], x, y);
+		        }
+            }
+            if (currentSelection != null) {
+            	//Additional for current selection
+                int x = currentSelection.getLetter(),
+                	y = height - currentSelection.getNumber() - 1,
+                	xpos = (x-1)*cellWidth, ypos = (y+1)*cellHeight;
+                g.setColor(Color.GREEN);
+                int currentField = parent.viewer.getColor(currentSelection);
+                int dir = currentField==Board.MOVESUP?-1:1;
+                if(dir==-1&&y!=0||dir==1&&y!=height-1){
+                	int ychange = dir==1?cellHeight:-cellHeight;
+                	ypos+= ychange;
+        			for(int xx=x-1;xx<=x+1;xx++){
+        				xpos+= cellWidth;
+        				if(SplinterTheOmniscientRat.DEBUG)
+        					g.drawRect(xpos, ypos, cellWidth, cellHeight);
+        				if(xx==-1||xx==width)
+        					continue;
+        				switch(parent.viewer.getRawAtXY(xx, y+dir)){
+        				case Board.MOVESUP:
+        					if(xx!=x&&currentField==Board.MOVESDOWN)
+        						g.drawImage(killStone, xpos, ypos, cellWidth, cellHeight, null);
+        					break;
+        				case Board.MOVESDOWN:
+        					if(xx!=x&&currentField==Board.MOVESUP)
+        						g.drawImage(killStone, xpos, ypos, cellWidth, cellHeight, null);
+        					break;
+        				case Setting.NONE:
+        					g.drawImage(currentField==Board.MOVESUP?movesUpL:movesDownL, xpos, ypos, cellWidth, cellHeight, null);
+        					break;
+        				}
+					}
+					xpos-= cellWidth;
+					ypos-= ychange;
+				}
+                g.setColor(Color.ORANGE);
+                g.drawRect(xpos, ypos, cellWidth, cellHeight);
+            }
+            if (SplinterTheOmniscientRat.DEBUG){
+				//Draw possible moves
+				int x, y = cellHeight/2, cellColor;
+				final int length = cellHeight;
+				for (int i = 0; i < parent.height; i++) {
+					x = cellWidth/2;
+					y += cellHeight;
+					for (int j = 0; j < parent.width; j++) {
+						x += cellWidth;
+						cellColor = parent.viewer.getRawAtXY(j, i);
+						g.setColor(cellColor==Setting.RED?DARKRED:NAVY);
+						switch(cellColor){
+						case Board.MOVESUP:
+							if(i==0) continue;
+							if(j!=0&&parent.viewer.getRawAtXY(j-1, i-1)!=cellColor)
+								drawArrow(g, x, y, x-cellWidth, y-cellHeight, -(3*Math.PI)/4, length);
+							if(parent.viewer.getRawAtXY(j, i-1)==Setting.NONE)
+								drawArrow(g, x, y, x, y-cellHeight, -Math.PI/2, length);
+							if(j!=width-1&&parent.viewer.getRawAtXY(j+1, i-1)!=cellColor)
+								drawArrow(g, x, y, x+cellWidth, y-cellHeight, -Math.PI/4, length);
+							break;
+						case Board.MOVESDOWN:
+							if(j!=0&&parent.viewer.getRawAtXY(j-1, i+1)!=cellColor)
+								drawArrow(g, x, y, x-cellWidth, y+cellHeight, (3*Math.PI)/4, length);
+							if(parent.viewer.getRawAtXY(j, i+1)==Setting.NONE)
+								drawArrow(g, x, y, x, y+cellHeight, Math.PI/2, length);
+							if(j!=width-1&&parent.viewer.getRawAtXY(j+1, i+1)!=cellColor)
+								drawArrow(g, x, y, x+cellWidth, y+cellHeight, Math.PI/4, length);
+							break;
+						}
+					}
+				}
+			}
+        }
+        
+        /**
+        * Draws arrow line
+        */
+        private void drawArrow(Graphics g1, int x1, int y1, int x2, int y2, double angle, int len) {
+		    final int ARR_SIZE = 7;
+		    Graphics2D g = (Graphics2D)g1.create();
+		    //double dx = x2 - x1, dy = y2 - y1;
+		    //double angle = Math.atan2(dy, dx);
+		    //int len = (int) Math.sqrt(dx*dx + dy*dy);
+		    AffineTransform at = AffineTransform.getTranslateInstance(x1, y1);
+		    at.concatenate(AffineTransform.getRotateInstance(angle));
+		    g.transform(at);
+
+		    // Draw horizontal arrow starting in (0, 0)
+		    g.drawLine(0, 0, len-ARR_SIZE, 0);
+		    g.fillPolygon(new int[] {len, len-ARR_SIZE, len-ARR_SIZE, len},
+		                  new int[] {0, -ARR_SIZE, ARR_SIZE, 0}, 4);
+		}
+    }
+    
+    /*
+    * Subclass for handling click events on the displayed board
+    */
+    private class Mouse extends MouseAdapter {
+        private GUI parent;
+
+        public Mouse(GUI parent) {
+            this.parent = parent;
+        }
+
+        public void mouseClicked(MouseEvent e) {
+            if(parent.hasEnded)return;
+            
+            int x = e.getX(), y = e.getY(),
+                xpos = x / parent.panel.cellWidth - 1, ypos = y / parent.panel.cellHeight - 1;
+
+            if (xpos < 0 || ypos < 0 || xpos >= parent.width || ypos >= parent.height)
+                return;
+
+            Position npos;
+            try {
+                npos = new Position(xpos, parent.height - ypos - 1);
+                if(parent.panel.requestColor()!=Setting.NONE&&
+                	((parent.panel.currentSelection==null&&parent.panel.requestColor()!=parent.colorAt(npos))
+                	||(parent.panel.currentSelection!=null&&(!parent.panel.currentSelection.equals(npos))&&parent.panel.requestColor()==parent.colorAt(npos))))
+                	return;//cannot select other colors when move requested and cannot move to own color
+            } catch (PresetException ex) {
+                return;
+            }
+            
+            if (parent.panel.currentSelection == null) {
+                parent.panel.currentSelection = npos;
+                parent.refresh();
+                return;
+            } else if (parent.panel.currentSelection.equals(npos)) {
+                parent.panel.currentSelection = null;
+                parent.refresh();
+                return;
+            }
+
+            if (parent.panel.requestColor() != Setting.NONE) {
+                //TODO check for validity
+				try {
+                    parent.panel.requestMove = new Move(parent.panel.currentSelection, npos);//TODO check for validity
+                    parent.panel.currentSelection = null;
+                } catch (PresetException ex) {
+                    return;
+                }
+                synchronized (parent.lock) {
+                    parent.lock.notify();
+                }
+            }
+        }
+    }
+}
