@@ -62,6 +62,8 @@ class CellGUI{
     private JPanel panel;
     private JFrame frame;
     private Board board;
+    private JTextField roundCount;
+    private int round=0;
 
     /**
     * Constrctor of the Object and setting the layout
@@ -81,9 +83,8 @@ class CellGUI{
         JLabel rounds = new JLabel("Rounds");
         top.add(rounds);
 
-        JTextField roundCount = new JTextField("200");
-        roundCount.setText("0");
-        roundCount.setSize(300, 50);
+        roundCount = new JTextField("200");
+        roundCount.setText("2000");
         top.add(roundCount);
 
         JButton start = new JButton("Start");
@@ -91,6 +92,8 @@ class CellGUI{
             @Override
             public void actionPerformed(ActionEvent e){
                 board.next();
+                round++;                
+                roundCount.setText(Integer.toString(round));
             }
         });
         top.add(start);
